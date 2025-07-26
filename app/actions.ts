@@ -75,7 +75,8 @@ export async function processUserInput(
 }
 
 // --------- Nuevas funciones con Gemini ---------
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ""
+// API key guardada directamente como solicitó el usuario
+const GEMINI_API_KEY = "AIzaSyCyh5_RkjurwXdJYBo79_ZZz0kAvkbn-Ic"
 
 interface FreeSlot {
   day: number
