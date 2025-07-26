@@ -39,6 +39,15 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
+    const load = async () => {
+      const { getEvents } = await import("./actions")
+      const { events } = await getEvents()
+      setSchedule(events)
+    }
+    load()
+  }, [])
+
+  useEffect(() => {
     if (schedule.length === 0) return
     setSchedule((prevSchedule) => {
       const newGymStartTime = gymPreference === "mañana" ? 7 : 18
@@ -103,12 +112,11 @@ export default function Home() {
     if (!inputText.trim()) return
     setIsProcessing(true)
     try {
-      // Llama a la acción del servidor para procesar el texto
-      const { processUserInput } = await import("./actions")
-      const { newEvents } = await processUserInput(inputText, schedule)
-
-      // Añade los nuevos eventos al calendario existente
-      setSchedule((prevSchedule) => [...prevSchedule, ...newEvents])
+      const { addEventFromText } = await import("./actions")
+      const { event } = await addEventFromText(inputText)
+      if (event) {
+        setSchedule((prev) => [...prev, event])
+      }
       setInputText("")
     } catch (error) {
       console.error("Error procesando la entrada:", error)

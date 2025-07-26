@@ -1,0 +1,18 @@
+[
+  {
+    "id": "event1",
+    "day": 1,
+    "startHour": 9,
+    "endHour": 10,
+    "title": "Evento Existente 1",
+    "color": "bg-blue-600"
+  },
+  {
+    "id": "event2",
+    "day": 3,
+    "startHour": 14,
+    "endHour": 15,
+    "title": "Evento Existente 2",
+    "color": "bg-green-600"
+  }
+]

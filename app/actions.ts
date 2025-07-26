@@ -3,7 +3,9 @@
 import { generateObject } from "ai"
 import { xai } from "@ai-sdk/xai"
 import { z } from "zod"
+import axios from "axios"
 import type { CalendarEvent } from "./components/weekly-calendar"
+import { readEvents, saveEvents } from "@/lib/events"
 
 // Definimos el esquema que esperamos de la IA
 const eventSchema = z.object({
@@ -69,5 +71,95 @@ export async function processUserInput(
   } catch (error) {
     console.error("Error al generar objeto con la IA:", error)
     return { newEvents: [] }
+  }
+}
+
+// --------- Nuevas funciones con Gemini ---------
+// API key guardada directamente como solicitó el usuario
+const GEMINI_API_KEY = "AIzaSyCyh5_RkjurwXdJYBo79_ZZz0kAvkbn-Ic"
+
+interface FreeSlot {
+  day: number
+  start: number
+  end: number
+}
+
+function calculateFreeSlots(events: CalendarEvent[]): FreeSlot[] {
+  const DAY_START = 7
+  const DAY_END = 22
+  const slots: FreeSlot[] = []
+
+  for (let day = 0; day < 7; day++) {
+    const dayEvents = events
+      .filter((e) => e.day === day)
+      .sort((a, b) => a.startHour - b.startHour)
+    let start = DAY_START
+    for (const ev of dayEvents) {
+      if (ev.startHour > start) {
+        slots.push({ day, start, end: ev.startHour })
+      }
+      start = Math.max(start, ev.endHour)
+    }
+    if (start < DAY_END) {
+      slots.push({ day, start, end: DAY_END })
+    }
+  }
+  return slots
+}
+
+export async function getEvents(): Promise<{ events: CalendarEvent[] }> {
+  const events = await readEvents()
+  return { events }
+}
+
+export async function addEventFromText(
+  text: string,
+): Promise<{ event: CalendarEvent | null }> {
+  const events = await readEvents()
+  const slots = calculateFreeSlots(events)
+
+  const slotLines = slots
+    .map(
+      (s) => `- Dia ${s.day}, desde ${s.start}:00 hasta ${s.end}:00`,
+    )
+    .join("\n")
+
+  const prompt = `Tengo que organizar mi semana. Mis bloques libres son:\n${slotLines}\nQuiero agendar la siguiente tarea: ${text}.\nResponde solo en JSON con el formato {"title":"tarea","day":numeroDia,"startHour":horaInicio,"endHour":horaFin}.`
+
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }],
+      },
+    ],
+  }
+
+  try {
+    const res = await axios.post(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      body,
+    )
+
+    const textResp =
+      res.data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}"
+
+    const obj = JSON.parse(textResp)
+    const newEvent: CalendarEvent = {
+      id: `gemini-${Date.now()}`,
+      title: obj.title || text,
+      day: obj.day,
+      startHour: obj.startHour,
+      endHour: obj.endHour,
+      color: "bg-pink-500",
+    }
+
+    events.push(newEvent)
+    await saveEvents(events)
+
+    return { event: newEvent }
+  } catch (err) {
+    console.error("Error consultando Gemini", err)
+    return { event: null }
   }
 }
